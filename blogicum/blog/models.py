@@ -1,102 +1,124 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from datetime import datetime as dt
-from django.db.models import QuerySet
-
-
-class CustomQuerySet(QuerySet):
-    def publish_filter(self):
-        return (self
-                .select_related('author', 'category')
-                .filter(
-                    is_published=True,
-                    pub_date__lte=dt.now(),
-                ))
-
-    def category_filter(self):
-        return self.publish_filter().filter(category__is_published=True)
-
 
 User = get_user_model()
 
 
-class BaseModel(models.Model):
+class Topic(models.Model):
+    title = models.CharField('Заголовок', max_length=256)
+    description = models.TextField('Описание')
+    slug = models.SlugField(
+        'Идентификатор',
+        unique=True,
+        help_text=(
+            'Идентификатор страницы для URL; разрешены символы латиницы, '
+            'цифры, дефис и подчёркивание.'
+        ),
+    )
     is_published = models.BooleanField(
+        'Опубликовано',
         default=True,
-        verbose_name='Опубликовано',
         help_text='Снимите галочку, чтобы скрыть публикацию.',
     )
-    created_at = models.DateTimeField(auto_now_add=True,
-                                      verbose_name='Добавлено')
+    created_at = models.DateTimeField('Добавлено', auto_now_add=True)
 
     class Meta:
-        abstract = True
-
-
-class Category(BaseModel):
-    title = models.CharField(max_length=256, verbose_name='Заголовок')
-    description = models.TextField(verbose_name='Описание')
-    slug = models.SlugField(
-        unique=True,
-        verbose_name='Идентификатор',
-        help_text=('Идентификатор страницы для URL; разрешены символы '
-                   'латиницы, цифры, дефис и подчёркивание.'),
-    )
-
-    class Meta:
-        verbose_name = 'категория'
-        verbose_name_plural = 'Категории'
+        verbose_name = 'тема'
+        verbose_name_plural = 'Темы'
+        db_table = 'blog_category'
 
     def __str__(self):
         return self.title
 
 
-class Location(BaseModel):
-    name = models.CharField(max_length=256, verbose_name='Название места')
+class Venue(models.Model):
+    name = models.CharField('Название места', max_length=256)
+    is_published = models.BooleanField(
+        'Опубликовано',
+        default=True,
+        help_text='Снимите галочку, чтобы скрыть публикацию.',
+    )
+    created_at = models.DateTimeField('Добавлено', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'местоположение'
-        verbose_name_plural = 'Местоположения'
+        verbose_name = 'место'
+        verbose_name_plural = 'Места'
+        db_table = 'blog_location'
 
     def __str__(self):
         return self.name
 
 
-class Post(BaseModel):
-    title = models.CharField(max_length=256, verbose_name='Заголовок')
-    text = models.TextField(verbose_name='Текст')
+class Article(models.Model):
+    title = models.CharField('Заголовок', max_length=256)
+    text = models.TextField('Текст')
     pub_date = models.DateTimeField(
-        verbose_name='Дата и время публикации',
-        help_text=('Если установить дату и время в будущем — можно '
-                   'делать отложенные публикации.'),
+        'Дата и время публикации',
+        help_text=(
+            'Если установить дату и время в будущем — можно делать '
+            'отложенные публикации.'
+        ),
     )
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         verbose_name='Автор публикации',
-        related_name='posts_for_author',
     )
     location = models.ForeignKey(
-        Location,
+        Venue,
         on_delete=models.SET_NULL,
-        blank=True,
         null=True,
-        related_name='posts_for_location',
+        blank=True,
         verbose_name='Местоположение',
     )
     category = models.ForeignKey(
-        Category,
+        Topic,
         on_delete=models.SET_NULL,
         null=True,
-        related_name='posts_for_category',
+        blank=False,
         verbose_name='Категория',
     )
-    objects = CustomQuerySet.as_manager()
+    is_published = models.BooleanField(
+        'Опубликовано',
+        default=True,
+        help_text='Снимите галочку, чтобы скрыть публикацию.',
+    )
+    created_at = models.DateTimeField('Добавлено', auto_now_add=True)
+    image = models.ImageField(
+        'Изображение',
+        upload_to='posts_images',
+        blank=True,
+    )
 
     class Meta:
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
-        ordering = ('-pub_date', 'title')
+        db_table = 'blog_post'
 
     def __str__(self):
         return self.title
+
+
+class Discussion(models.Model):
+    post = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        verbose_name='Публикация',
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name='Автор комментария',
+    )
+    text = models.TextField('Текст комментария')
+    created_at = models.DateTimeField('Добавлено', auto_now_add=True)
+
+    class Meta:
+        ordering = ('created_at',)
+        verbose_name = 'обсуждение'
+        verbose_name_plural = 'Обсуждения'
+        db_table = 'blog_comment'
+
+    def __str__(self):
+        return self.text[:50]
