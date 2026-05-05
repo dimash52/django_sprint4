@@ -7,37 +7,37 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView
 
-from .forms import DiscussionForm, ArticleForm, SignUpForm, ProfileEditForm
-from .models import Topic, Discussion, Article
+from .forms import CommentForm, PostForm, RegistrationForm, UserEditForm
+from .models import Category, Comment, Post
 
-ARTICLES_PER_PAGE = 10
+POSTS_PER_PAGE = 10
 
 User = get_user_model()
 
 
-class SignUpView(CreateView):
-    form_class = SignUpForm
+class RegistrationCreateView(CreateView):
+    form_class = RegistrationForm
     template_name = 'registration/registration_form.html'
 
     def get_success_url(self):
         return reverse('login')
 
 
-def user_can_edit(user, obj):
+def is_author_or_admin(user, obj):
     return user == obj.author or user.is_staff or user.is_superuser
 
 
-def is_article_visible(article):
+def post_is_public(post):
     return (
-        article.is_published
-        and article.pub_date <= timezone.now()
-        and article.category
-        and article.category.is_published
+        post.is_published
+        and post.pub_date <= timezone.now()
+        and post.category
+        and post.category.is_published
     )
 
 
-def get_published_articles():
-    return Article.objects.select_related(
+def get_public_posts():
+    return Post.objects.select_related(
         'author',
         'category',
         'location',
@@ -48,14 +48,14 @@ def get_published_articles():
     ).order_by('-pub_date')
 
 
-def paginate(request, queryset):
-    paginator = Paginator(queryset, ARTICLES_PER_PAGE)
+def paginate_queryset(request, queryset):
+    paginator = Paginator(queryset, POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     return paginator.get_page(page_number)
 
 
-def homepage(request):  # бывшая index
-    page_obj = paginate(request, get_published_articles())
+def index(request):
+    page_obj = paginate_queryset(request, get_public_posts())
     return render(
         request,
         'blog/index.html',
@@ -63,51 +63,50 @@ def homepage(request):  # бывшая index
     )
 
 
-def topic_posts(request, slug):
-    topic = get_object_or_404(Topic, slug=slug, is_published=True)
-    page_obj = paginate(
+def category_detail(request, slug):
+    category = get_object_or_404(Category, slug=slug, is_published=True)
+    page_obj = paginate_queryset(
         request,
-        get_published_articles().filter(category=topic),
+        get_public_posts().filter(category=category),
     )
     return render(
         request,
         'blog/category.html',
         {
-            'category': topic,
+            'category': category,
             'page_obj': page_obj,
         },
     )
 
 
-def article_detail(request, post_id):
-    article = get_object_or_404(
-        Article.objects.select_related(
+def post_detail(request, post_id):
+    post = get_object_or_404(
+        Post.objects.select_related(
             'author',
             'category',
             'location',
         ),
         pk=post_id,
     )
-    if request.user != article.author and not is_article_visible(article):
+    if request.user != post.author and not post_is_public(post):
         from django.http import Http404
         raise Http404
-    discussion_form = DiscussionForm() if request.user.is_authenticated else None
-    discussions = article.comments.select_related(
-        'author').order_by('created_at')
+    comment_form = CommentForm() if request.user.is_authenticated else None
+    comments = post.comments.select_related('author').order_by('created_at')
     return render(
         request,
         'blog/detail.html',
         {
-            'post': article,
-            'comment_form': discussion_form,
-            'comments': discussions,
+            'post': post,
+            'comment_form': comment_form,
+            'comments': comments,
         },
     )
 
 
-def user_profile(request, username):
+def profile(request, username):
     profile_user = get_object_or_404(User, username=username)
-    queryset = Article.objects.select_related(
+    queryset = Post.objects.select_related(
         'author',
         'category',
         'location',
@@ -118,7 +117,7 @@ def user_profile(request, username):
             pub_date__lte=timezone.now(),
             category__is_published=True,
         )
-    page_obj = paginate(request, queryset.order_by('-pub_date'))
+    page_obj = paginate_queryset(request, queryset.order_by('-pub_date'))
     return render(
         request,
         'blog/profile.html',
@@ -130,8 +129,8 @@ def user_profile(request, username):
 
 
 @login_required
-def update_profile(request):
-    form = ProfileEditForm(
+def edit_profile(request):
+    form = UserEditForm(
         request.POST or None,
         instance=request.user,
     )
@@ -146,15 +145,15 @@ def update_profile(request):
 
 
 @login_required
-def new_article(request):
-    form = ArticleForm(
+def create_post(request):
+    form = PostForm(
         request.POST or None,
         files=request.FILES or None,
     )
     if form.is_valid():
-        article = form.save(commit=False)
-        article.author = request.user
-        article.save()
+        post = form.save(commit=False)
+        post.author = request.user
+        post.save()
         return redirect('blog:profile', username=request.user.username)
     return render(
         request,
@@ -167,95 +166,95 @@ def new_article(request):
 
 
 @login_required
-def edit_article(request, post_id):
-    article = get_object_or_404(Article, pk=post_id)
-    if not user_can_edit(request.user, article):
-        return redirect('blog:post_detail', post_id=article.id)
-    form = ArticleForm(
+def edit_post(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    if not is_author_or_admin(request.user, post):
+        return redirect('blog:post_detail', post_id=post.id)
+    form = PostForm(
         request.POST or None,
         files=request.FILES or None,
-        instance=article,
+        instance=post,
     )
     if form.is_valid():
         form.save()
-        return redirect('blog:post_detail', post_id=article.id)
+        return redirect('blog:post_detail', post_id=post.id)
     return render(
         request,
         'blog/create.html',
         {
             'form': form,
-            'post': article,
+            'post': post,
             'is_edit': True,
         },
     )
 
 
 @login_required
-def delete_article(request, post_id):
-    article = get_object_or_404(Article, pk=post_id)
-    if not user_can_edit(request.user, article):
-        return redirect('blog:post_detail', post_id=article.id)
+def delete_post(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    if not is_author_or_admin(request.user, post):
+        return redirect('blog:post_detail', post_id=post.id)
     if request.method == 'POST':
-        article.delete()
+        post.delete()
         return redirect('blog:index')
     return render(
         request,
         'blog/delete.html',
-        {'post': article},
+        {'post': post},
     )
 
 
 @login_required
-def add_discussion(request, post_id):
-    article = get_object_or_404(Article, pk=post_id)
-    if not is_article_visible(article) and request.user != article.author:
+def add_comment(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    if not post_is_public(post) and request.user != post.author:
         from django.http import Http404
         raise Http404
-    form = DiscussionForm(request.POST or None)
+    form = CommentForm(request.POST or None)
     if form.is_valid():
-        discussion = form.save(commit=False)
-        discussion.author = request.user
-        discussion.post = article
-        discussion.save()
-    return redirect('blog:post_detail', post_id=article.id)
+        comment = form.save(commit=False)
+        comment.author = request.user
+        comment.post = post
+        comment.save()
+    return redirect('blog:post_detail', post_id=post.id)
 
 
 @login_required
-def edit_discussion(request, post_id, comment_id):
-    article = get_object_or_404(Article, pk=post_id)
-    discussion = get_object_or_404(Discussion, pk=comment_id, post=article)
-    if not user_can_edit(request.user, discussion):
-        return redirect('blog:post_detail', post_id=article.id)
-    form = DiscussionForm(request.POST or None, instance=discussion)
+def edit_comment(request, post_id, comment_id):
+    post = get_object_or_404(Post, pk=post_id)
+    comment = get_object_or_404(Comment, pk=comment_id, post=post)
+    if not is_author_or_admin(request.user, comment):
+        return redirect('blog:post_detail', post_id=post.id)
+    form = CommentForm(request.POST or None, instance=comment)
     if form.is_valid():
         form.save()
-        return redirect('blog:post_detail', post_id=article.id)
+        return redirect('blog:post_detail', post_id=post.id)
     return render(
         request,
         'blog/comment.html',
         {
             'form': form,
-            'comment': discussion,
-            'post': article,
+            'comment': comment,
+            'post': post,
             'is_edit': True,
         },
     )
 
 
 @login_required
-def delete_discussion(request, post_id, comment_id):
-    article = get_object_or_404(Article, pk=post_id)
-    discussion = get_object_or_404(Discussion, pk=comment_id, post=article)
-    if not user_can_edit(request.user, discussion):
-        return redirect('blog:post_detail', post_id=article.id)
+def delete_comment(request, post_id, comment_id):
+    post = get_object_or_404(Post, pk=post_id)
+    comment = get_object_or_404(Comment, pk=comment_id, post=post)
+    if not is_author_or_admin(request.user, comment):
+        return redirect('blog:post_detail', post_id=post.id)
     if request.method == 'POST':
-        discussion.delete()
-        return redirect('blog:post_detail', post_id=article.id)
+        comment.delete()
+        return redirect('blog:post_detail', post_id=post.id)
     return render(
         request,
         'blog/delete.html',
         {
-            'comment': discussion,
-            'post': article,
+            'comment': comment,
+            'post': post,
         },
     )

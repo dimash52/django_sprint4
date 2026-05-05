@@ -1,26 +1,36 @@
-from django.contrib import admin
-from .models import Topic, Venue, Article, Discussion
+from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
+
+from .models import Comment, Post
+
+User = get_user_model()
 
 
-@admin.register(Topic)
-class TopicAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug', 'is_published', 'created_at')
-    prepopulated_fields = {'slug': ('title',)}
+class PostForm(forms.ModelForm):
+
+    class Meta:
+        model = Post
+        fields = ('title', 'text', 'pub_date', 'category', 'location', 'image')
 
 
-@admin.register(Venue)
-class VenueAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_published', 'created_at')
+class CommentForm(forms.ModelForm):
+
+    class Meta:
+        model = Comment
+        fields = ('text',)
 
 
-@admin.register(Article)
-class ArticleAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'category', 'pub_date', 'is_published')
-    list_filter = ('is_published', 'category')
-    search_fields = ('title', 'text')
+class UserEditForm(forms.ModelForm):
+
+    class Meta:
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'email')
 
 
-@admin.register(Discussion)
-class DiscussionAdmin(admin.ModelAdmin):
-    list_display = ('text', 'author', 'post', 'created_at')
-    search_fields = ('text',)
+class RegistrationForm(UserCreationForm):
+    email = forms.EmailField(required=True)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'email')

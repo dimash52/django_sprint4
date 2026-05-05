@@ -2,30 +2,33 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import Discussion, Article
+from .models import Comment, Post
 
 User = get_user_model()
 
 
-class ArticleForm(forms.ModelForm):
+class PostForm(forms.ModelForm):
+
     class Meta:
-        model = Article
+        model = Post
         fields = ('title', 'text', 'pub_date', 'category', 'location', 'image')
 
 
-class DiscussionForm(forms.ModelForm):
+class CommentForm(forms.ModelForm):
+
     class Meta:
-        model = Discussion
+        model = Comment
         fields = ('text',)
 
 
-class ProfileEditForm(forms.ModelForm):
+class UserEditForm(forms.ModelForm):
+
     class Meta:
         model = User
         fields = ('username', 'first_name', 'last_name', 'email')
 
 
-class SignUpForm(UserCreationForm):
+class RegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True)
 
     class Meta(UserCreationForm.Meta):

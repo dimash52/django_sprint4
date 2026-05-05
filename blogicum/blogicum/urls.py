@@ -3,12 +3,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 
-from blog.views import SignUpView
+from blog.views import RegistrationCreateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('pages/', include('pages.urls')),
-    path('auth/registration/', SignUpView.as_view(), name='registration'),
+    path('auth/registration/', RegistrationCreateView.as_view(), name='registration'),
     path('auth/', include('django.contrib.auth.urls')),
     path('', include('blog.urls')),
 ]

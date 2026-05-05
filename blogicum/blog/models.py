@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-class Topic(models.Model):
+class Category(models.Model):
     title = models.CharField('Заголовок', max_length=256)
     description = models.TextField('Описание')
     slug = models.SlugField(
@@ -23,15 +23,14 @@ class Topic(models.Model):
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'тема'
-        verbose_name_plural = 'Темы'
-        db_table = 'blog_category'
+        verbose_name = 'категория'
+        verbose_name_plural = 'Категории'
 
     def __str__(self):
         return self.title
 
 
-class Venue(models.Model):
+class Location(models.Model):
     name = models.CharField('Название места', max_length=256)
     is_published = models.BooleanField(
         'Опубликовано',
@@ -41,15 +40,14 @@ class Venue(models.Model):
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'место'
-        verbose_name_plural = 'Места'
-        db_table = 'blog_location'
+        verbose_name = 'местоположение'
+        verbose_name_plural = 'Местоположения'
 
     def __str__(self):
         return self.name
 
 
-class Article(models.Model):
+class Post(models.Model):
     title = models.CharField('Заголовок', max_length=256)
     text = models.TextField('Текст')
     pub_date = models.DateTimeField(
@@ -65,14 +63,14 @@ class Article(models.Model):
         verbose_name='Автор публикации',
     )
     location = models.ForeignKey(
-        Venue,
+        Location,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name='Местоположение',
     )
     category = models.ForeignKey(
-        Topic,
+        Category,
         on_delete=models.SET_NULL,
         null=True,
         blank=False,
@@ -93,15 +91,14 @@ class Article(models.Model):
     class Meta:
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
-        db_table = 'blog_post'
 
     def __str__(self):
         return self.title
 
 
-class Discussion(models.Model):
+class Comment(models.Model):
     post = models.ForeignKey(
-        Article,
+        Post,
         on_delete=models.CASCADE,
         related_name='comments',
         verbose_name='Публикация',
@@ -116,9 +113,8 @@ class Discussion(models.Model):
 
     class Meta:
         ordering = ('created_at',)
-        verbose_name = 'обсуждение'
-        verbose_name_plural = 'Обсуждения'
-        db_table = 'blog_comment'
+        verbose_name = 'комментарий'
+        verbose_name_plural = 'Комментарии'
 
     def __str__(self):
         return self.text[:50]
