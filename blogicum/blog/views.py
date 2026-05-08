@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -24,7 +25,7 @@ class RegistrationCreateView(CreateView):
 
 
 def is_author_or_admin(user, obj):
-    return user == obj.author or user.is_staff or user.is_superuser
+    return user == obj.author
 
 
 def post_is_public(post):
@@ -89,16 +90,15 @@ def post_detail(request, post_id):
         pk=post_id,
     )
     if request.user != post.author and not post_is_public(post):
-        from django.http import Http404
         raise Http404
-    comment_form = CommentForm() if request.user.is_authenticated else None
+    form = CommentForm()
     comments = post.comments.select_related('author').order_by('created_at')
     return render(
         request,
         'blog/detail.html',
         {
             'post': post,
-            'comment_form': comment_form,
+            'form': form,
             'comments': comments,
         },
     )
@@ -199,16 +199,18 @@ def delete_post(request, post_id):
         return redirect('blog:index')
     return render(
         request,
-        'blog/delete.html',
-        {'post': post},
+        'blog/create.html',
+        {
+            'form': PostForm(instance=post),
+            'post': post,
+        },
     )
 
 
 @login_required
 def add_comment(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
-    if not post_is_public(post) and request.user != post.author:
-        from django.http import Http404
+    if not post_is_public(post):
         raise Http404
     form = CommentForm(request.POST or None)
     if form.is_valid():
@@ -216,7 +218,17 @@ def add_comment(request, post_id):
         comment.author = request.user
         comment.post = post
         comment.save()
-    return redirect('blog:post_detail', post_id=post.id)
+        return redirect('blog:post_detail', post_id=post.id)
+    comments = post.comments.select_related('author').order_by('created_at')
+    return render(
+        request,
+        'blog/detail.html',
+        {
+            'post': post,
+            'form': form,
+            'comments': comments,
+        },
+    )
 
 
 @login_required
@@ -252,7 +264,7 @@ def delete_comment(request, post_id, comment_id):
         return redirect('blog:post_detail', post_id=post.id)
     return render(
         request,
-        'blog/delete.html',
+        'blog/comment.html',
         {
             'comment': comment,
             'post': post,

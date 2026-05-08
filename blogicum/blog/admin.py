@@ -1,36 +1,42 @@
-from django import forms
-from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib import admin
 
-from .models import Comment, Post
-
-User = get_user_model()
+from .models import Category, Comment, Location, Post
 
 
-class PostForm(forms.ModelForm):
-
-    class Meta:
-        model = Post
-        fields = ('title', 'text', 'pub_date', 'category', 'location', 'image')
-
-
-class CommentForm(forms.ModelForm):
-
-    class Meta:
-        model = Comment
-        fields = ('text',)
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('title', 'slug', 'is_published', 'created_at')
+    list_editable = ('is_published',)
+    search_fields = ('title', 'description', 'slug')
+    list_filter = ('is_published', 'created_at')
 
 
-class UserEditForm(forms.ModelForm):
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'is_published', 'created_at')
+    list_editable = ('is_published',)
+    search_fields = ('name',)
+    list_filter = ('is_published', 'created_at')
 
-    class Meta:
-        model = User
-        fields = ('username', 'first_name', 'last_name', 'email')
+
+@admin.register(Post)
+class PostAdmin(admin.ModelAdmin):
+    list_display = (
+        'title',
+        'author',
+        'category',
+        'location',
+        'pub_date',
+        'is_published',
+        'created_at',
+    )
+    list_editable = ('is_published',)
+    search_fields = ('title', 'text', 'author__username')
+    list_filter = ('is_published', 'category', 'location', 'pub_date')
 
 
-class RegistrationForm(UserCreationForm):
-    email = forms.EmailField(required=True)
-
-    class Meta(UserCreationForm.Meta):
-        model = User
-        fields = ('username', 'first_name', 'last_name', 'email')
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ('post', 'author', 'text', 'created_at')
+    search_fields = ('text', 'author__username', 'post__title')
+    list_filter = ('created_at',)
